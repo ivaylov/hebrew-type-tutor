@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      Hebrew Typing Tutor (Speaking and Translating) | מורה פרטי להקלדה עברית
+      (דיבור ותרגום)
+    </title>
+
+    <style>
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        background: #f2f2f2;
+        max-width: 900px;
+        margin: auto;
+        padding: 20px;
+        text-align: center;
+      }
+
+      h1 {
+        text-align: center;
+      }
+
+      #hebrew {
+        direction: rtl;
+        text-align: right;
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+        font-size: 44px;
+        min-height: 80px;
+        text-align: center;
+      }
+
+      #translation {
+        margin-top: 15px;
+        font-size: 22px;
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 20px;
+        color: #0055aa;
+        margin-top: 20px;
+        font-size: 44px;
+        min-height: 80px;
+        text-align: center;
+      }
+
+      #typing {
+        direction: rtl;
+        text-align: right;
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 30px;
+        padding: 10px;
+        margin-top: 20px;
+        text-align: center;
+      }
+
+      button {
+        padding: 10px 20px;
+        margin: 10px 5px;
+        font-size: 16px;
+        text-align: center;
+      }
+
+      #status {
+        margin-top: 15px;
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+      }
+
+      #progress {
+        margin-top: 15px;
+        font-size: 18px;
+        text-align: center;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>
+       מורה פרטי להקלדה עברית
+      (דיבור ותרגום)
+      </br>
+      Hebrew Typing Tutor (Speaking and Translating) 
+    </h1>
+
+    <input type="file" id="fileInput" accept=".txt" />
+
+    <div id="progress"></div>
+
+    <div id="hebrew"></div>
+
+    <div id="translation"></div>
+
+    <div>
+      <button id="speakBtn">Speak | לדבר</button>
+
+      <button id="repeatBtn">Repeat | לחזור על</button>
+    </div>
+
+    <input
+      id="typing"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="הקלד את המשפט העברי כאן | Type the Hebrew sentence here"
+    />
+
+    <div id="status"></div>
+
+    </br>
+    F2 = Repeat current sentence</br>
+    Escape = Stop speaking</br>
+    Ctrl + Right Arrow = Next line</br>
+    Ctrl + Left Arrow = Previous line</br>
+    </br>
+    with ❤️ and Github
+    <script>
+      const DEFAULT_TEXT_URL = "https://raw.githubusercontent.com/ivaylov/hebrew-type-tutor/refs/heads/main/hebrew.txt";
+
+      let lines = [];
+      let current = 0;
+
+      let hebrewVoice = null;
+      let currentUtterance = null;
+
+      const hebrewDiv = document.getElementById("hebrew");
+      const translationDiv = document.getElementById("translation");
+      const typing = document.getElementById("typing");
+      const progress = document.getElementById("progress");
+      const status = document.getElementById("status");
+
+      window.addEventListener("load", async () => {
+        try {
+          const response = await fetch(DEFAULT_TEXT_URL);
+
+          if (!response.ok) throw new Error();
+
+          const text = await response.text();
+
+          loadText(text);
+        } catch (err) {
+          console.log("Default text not found.");
+          console.log("Choose a local text file.");
+        }
+      });
+
+      document.getElementById("fileInput").addEventListener("change", (e) => {
+        const file = e.target.files[0];
+
+        if (!file) return;
+
+        const reader = new FileReader();
+
+        reader.onload = () => {
+          loadText(reader.result);
+        };
+
+        reader.readAsText(file, "UTF-8");
+      });
+
+      function loadText(text) {
+        lines = text
+          .split(/\r?\n/)
+          .map((x) => x.trim())
+          .filter((x) => x.length > 0);
+
+        current = 0;
+
+        loadLine();
+      }
+      function loadVoices() {
+        const voices = speechSynthesis.getVoices();
+
+        hebrewVoice =
+          voices.find((v) => v.lang.startsWith("he")) ||
+          voices.find((v) => v.lang.startsWith("iw")) ||
+          null;
+
+        console.log("Voices:");
+
+        voices.forEach((v) => {
+          console.log(v.name + "  " + v.lang);
+        });
+      }
+
+      speechSynthesis.onvoiceschanged = loadVoices;
+      loadVoices();
+
+      function speakCurrentLine() {
+        if (current >= lines.length) return;
+
+        speechSynthesis.cancel();
+
+        currentUtterance = new SpeechSynthesisUtterance(lines[current]);
+
+        currentUtterance.lang = "he-IL";
+
+        if (hebrewVoice) currentUtterance.voice = hebrewVoice;
+
+        currentUtterance.rate = 0.85;
+        currentUtterance.pitch = 1.0;
+        currentUtterance.volume = 1;
+
+        speechSynthesis.speak(currentUtterance);
+      }
+
+      document.getElementById("speakBtn").onclick = speakCurrentLine;
+
+      document.getElementById("repeatBtn").onclick = speakCurrentLine;
+
+      async function translate(text) {
+        try {
+          const url =
+            "https://translate.googleapis.com/translate_a/single?client=gtx&sl=he&tl=en&dt=t&q=" +
+            encodeURIComponent(text);
+
+          const response = await fetch(url);
+
+          const data = await response.json();
+
+          return data[0].map((item) => item[0]).join("");
+        } catch (e) {
+          return "(Translation unavailable)";
+        }
+      }
+
+      async function loadLine() {
+        if (current >= lines.length) {
+          hebrewDiv.textContent = "Finished!";
+          translationDiv.textContent = "";
+          progress.textContent = "";
+          status.textContent = "";
+
+          typing.disabled = true;
+
+          speechSynthesis.cancel();
+
+          return;
+        }
+
+        const line = lines[current];
+
+        progress.textContent = "Line " + (current + 1) + " / " + lines.length;
+
+        hebrewDiv.textContent = line;
+
+        translationDiv.textContent = "Translating...";
+
+        typing.value = "";
+
+        typing.focus();
+
+        status.textContent = "";
+
+        const english = await translate(line);
+
+        translationDiv.textContent = english;
+
+        setTimeout(() => {
+          speakCurrentLine();
+        }, 300);
+      }
+      typing.addEventListener("input", () => {
+        if (current >= lines.length) return;
+
+        const target = lines[current];
+        const typed = typing.value;
+
+        // Correct prefix
+        if (target.startsWith(typed)) {
+          status.style.color = "green";
+
+          if (typed.length === target.length) {
+            status.textContent = "Correct!";
+          } else {
+            status.textContent = "";
+          }
+        } else {
+          status.style.color = "red";
+          status.textContent = "Typing mistake";
+        }
+
+        // Completed line correctly
+        if (typed === target) {
+          speechSynthesis.cancel();
+
+          current++;
+
+          setTimeout(() => {
+            loadLine();
+          }, 500);
+        }
+      });
+
+      typing.addEventListener("keydown", (e) => {
+        // Prevent Enter from submitting
+        if (e.key === "Enter") {
+          e.preventDefault();
+        }
+      });
+
+      document.addEventListener("keydown", (e) => {
+        // F2 = Repeat current sentence
+        if (e.key === "F2") {
+          e.preventDefault();
+
+          speakCurrentLine();
+        }
+
+        // Escape = Stop speaking
+        if (e.key === "Escape") {
+          speechSynthesis.cancel();
+        }
+
+        // Ctrl + Right Arrow = Next line
+        if (e.ctrlKey && e.key === "ArrowRight") {
+          e.preventDefault();
+
+          if (current < lines.length - 1) {
+            speechSynthesis.cancel();
+
+            current++;
+
+            loadLine();
+          }
+        }
+
+        // Ctrl + Left Arrow = Previous line
+        if (e.ctrlKey && e.key === "ArrowLeft") {
+          e.preventDefault();
+
+          if (current > 0) {
+            speechSynthesis.cancel();
+
+            current--;
+
+            loadLine();
+          }
+        }
+      });
+
+      document.body.addEventListener("click", () => {
+        typing.focus();
+      });
+
+      window.addEventListener("beforeunload", () => {
+        speechSynthesis.cancel();
+      });
+
+      // Keep the typing box focused
+      setInterval(() => {
+        if (document.activeElement !== typing) {
+          typing.focus();
+        }
+      }, 1000);
+      // ---------- Startup ----------
+
+      // Show a message until a lesson is loaded.
+      if (lines.length === 0) {
+        hebrewDiv.textContent =
+          "Load UTF-8 Hebrew text file";
+
+        translationDiv.textContent = "";
+      }
+
+      // Spacebar repeats the current sentence
+      document.addEventListener("keydown", (e) => {
+        // Don't interfere while typing
+        if (document.activeElement === typing) return;
+
+        if (e.code === "Space") {
+          e.preventDefault();
+
+          speakCurrentLine();
+        }
+      });
+
+      // Focus the typing box whenever a lesson starts
+      const originalLoadLine = loadLine;
+
+      loadLine = async function () {
+        await originalLoadLine();
+
+        if (current < lines.length) {
+          typing.disabled = false;
+
+          setTimeout(() => {
+            typing.focus();
+          }, 100);
+        }
+      };
+
+      // Stop speech if the browser window loses focus
+      window.addEventListener("blur", () => {
+        speechSynthesis.cancel();
+      });
+
+      // Prevent browser autocomplete
+      typing.setAttribute("autocomplete", "off");
+      typing.setAttribute("autocorrect", "off");
+      typing.setAttribute("autocapitalize", "off");
+    </script>
+  </body>
+</html>
